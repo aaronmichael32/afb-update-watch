@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  standards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+      - run: composer install --no-interaction --no-progress
+      - name: WordPress coding standards and PHP 7.4+ compatibility
+        run: vendor/bin/phpcs
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Oldest supported (PHP 7.4, WordPress 6.2)
+            php: '7.4'
+            core: 'WordPress/WordPress#6.2'
+          - name: Current (PHP 8.4, latest WordPress)
+            php: '8.4'
+            core: null
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+      - run: composer install --no-interaction --no-progress
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Start WordPress
+        run: |
+          echo '{ "core": ${{ matrix.core && format('"{0}"', matrix.core) || 'null' }}, "phpVersion": "${{ matrix.php }}" }' > .wp-env.override.json
+          npx -y @wordpress/env start
+      - name: Tests, single site
+        run: npx -y @wordpress/env run tests-cli --env-cwd=wp-content/plugins/afb-update-watch vendor/bin/phpunit
+      - name: Tests, multisite
+        run: npx -y @wordpress/env run tests-cli --env-cwd=wp-content/plugins/afb-update-watch bash -c 'WP_MULTISITE=1 vendor/bin/phpunit'
+
+  plugin-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the release folder
+        run: |
+          mkdir -p build/afb-update-watch
+          rsync -a --exclude-from=.distignore ./ build/afb-update-watch/
+      - uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: build/afb-update-watch
+          exclude-checks: update_modification_detected

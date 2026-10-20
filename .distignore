@@ -1,0 +1,15 @@
+/.git
+/.github
+/tests
+/vendor
+/node_modules
+.distignore
+.gitignore
+.wp-env.json
+.wp-env.override.json
+composer.json
+composer.lock
+phpcs.xml.dist
+phpunit.xml.dist
+/.wordpress-org
+README.md
